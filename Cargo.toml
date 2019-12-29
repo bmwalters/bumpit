@@ -1,0 +1,14 @@
+[package]
+name = "bumpit"
+version = "0.0.1"
+authors = ["Bradley Walters <oss@walters.app>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[dependencies.sdl2]
+version = "0.32"
+default-features = false
+features = ["gfx"]
