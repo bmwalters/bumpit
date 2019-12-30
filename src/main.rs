@@ -38,6 +38,18 @@ struct Chart {
     notes: std::vec::Vec<Note>,
 }
 
+impl Chart {
+    fn ticks_to_ms(self: &Self, ticks: u32) -> f32 {
+        ((ticks as f32) / (self.ticks_per_beat as f32)) / (self.beats_per_minute as f32) * 60f32 * 1000f32
+    }
+}
+
+struct Playthrough {
+    chart: Chart,
+    hit: u32,
+    overstrums: u32,
+}
+
 fn draw_fret<T: sdl2::render::RenderTarget>(canvas: &sdl2::render::Canvas<T>, enabled: bool, x: i16, y: i16, radius: i16, color: pixels::Color) -> Result<(), String> {
     if enabled {
         canvas.filled_circle(x, y, radius, color)
@@ -136,6 +148,12 @@ fn main() -> Result<(), String> {
         Note { ticks: 10560, lane: Fret::B, duration: 72 },]
     };
 
+    let mut playthrough = Playthrough {
+        chart: chart,
+        hit: 0,
+        overstrums: 0,
+    };
+
     let mut frets: [bool; 5] = [false, false, false, false, false];
     frets[Fret::G as usize] = false;
     frets[Fret::R as usize] = false;
@@ -143,9 +161,13 @@ fn main() -> Result<(), String> {
     frets[Fret::B as usize] = false;
     frets[Fret::O as usize] = false;
 
-    fn draw<T: sdl2::render::RenderTarget>(canvas: &mut sdl2::render::Canvas<T>, chart: &Chart, frets: &[bool; 5], time: f32) {
+    fn draw<T: sdl2::render::RenderTarget>(canvas: &mut sdl2::render::Canvas<T>, playthrough: &Playthrough, frets: &[bool; 5], time: f32) {
         canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
         canvas.clear();
+
+        for i in 0..playthrough.hit {
+            let _ = draw_fret(&canvas, true, (i as i16) * 10, 10, 5, pixels::Color::RGB(255, 255, 255));
+        }
 
         let _ = draw_fret(&canvas, frets[Fret::G as usize], 50, (SCREEN_HEIGHT as i16) - 75, 25, pixels::Color::RGB(0, 128, 0));
         let _ = draw_fret(&canvas, frets[Fret::R as usize], 150, (SCREEN_HEIGHT as i16) - 75, 25, pixels::Color::RGB(128, 0, 0));
@@ -153,9 +175,8 @@ fn main() -> Result<(), String> {
         let _ = draw_fret(&canvas, frets[Fret::B as usize], 350, (SCREEN_HEIGHT as i16) - 75, 25, pixels::Color::RGB(0, 0, 128));
         let _ = draw_fret(&canvas, frets[Fret::O as usize], 450, (SCREEN_HEIGHT as i16) - 75, 25, pixels::Color::RGB(192, 128, 00));
 
-        for note in &chart.notes {
-            let ms_in = ((note.ticks as f32) / (chart.ticks_per_beat as f32)) / (chart.beats_per_minute as f32) * 60f32 * 1000f32;
-            let position_past_time = ms_in - time;
+        for note in &playthrough.chart.notes {
+            let position_past_time = playthrough.chart.ticks_to_ms(note.ticks) - time;
             let progress_on_screen = position_past_time / 1000f32;
             if progress_on_screen > 1f32 || progress_on_screen < 0f32 {
                 continue;
@@ -185,6 +206,8 @@ fn main() -> Result<(), String> {
                 Event::KeyUp { keycode : Some(Keycode::V), .. } => Some(InputAction::FretUp(Fret::B)),
                 Event::KeyUp { keycode : Some(Keycode::B), .. } => Some(InputAction::FretUp(Fret::O)),
 
+                Event::KeyDown { keycode : Some(Keycode::Space), .. } => Some(InputAction::Strum),
+
                 _ => None
             })
     }
@@ -209,14 +232,25 @@ fn main() -> Result<(), String> {
             last_playhead_pos_ms = playhead_pos_ms;
         }
 
-        draw(&mut canvas, &chart, &frets, song_time_ms);
+        draw(&mut canvas, &playthrough, &frets, song_time_ms);
 
         input(&mut events)
             .for_each(|action| match action {
                 Some(InputAction::Quit) => run = false,
                 Some(InputAction::FretDown(fret)) => frets[fret as usize] = true,
                 Some(InputAction::FretUp(fret)) => frets[fret as usize] = false,
-                Some(InputAction::Strum) => std::todo!(),
+                Some(InputAction::Strum) => {
+                    let first_near = playthrough.chart.notes.iter().find(|note|
+                        (song_time_ms - playthrough.chart.ticks_to_ms(note.ticks)).abs() < 60f32);
+                    match first_near {
+                        None => playthrough.overstrums += 1,
+                        Some(first_note) => {
+                            if frets[first_note.lane as usize] {
+                                playthrough.hit += 1;
+                            }
+                        }
+                    }
+                },
                 None => (),
             });
 
