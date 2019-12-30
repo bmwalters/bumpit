@@ -16,6 +16,7 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 name = "bumpit"
 version = "0.0.1"
 dependencies = [
+ "ears",
  "sdl2",
 ]
 
@@ -41,10 +42,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "ears"
+version = "0.5.1"
+source = "git+https://github.com/nickbrowne/ears.git?branch=fix-music-buffer-bug#e594bf6c40e8f2ab1dacf0bfaad6c69a14341d29"
+dependencies = [
+ "lazy_static 0.2.11",
+ "libc",
+]
+
+[[package]]
 name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a06f77d526c1a601b7c4cdd98f54b5eaabffc14d5f2f0296febdc7f357c6d3ba"
+
+[[package]]
+name = "lazy_static"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76f033c7ad61445c5b347c7382dd1237847eb1bce590fe50365dcb33d546be73"
 
 [[package]]
 name = "lazy_static"
@@ -222,7 +238,7 @@ checksum = "d051a07231e303f5f719da78cb6f7394f6d5b54f733aef5b0b447804a83edd7b"
 dependencies = [
  "bitflags",
  "c_vec",
- "lazy_static",
+ "lazy_static 1.4.0",
  "libc",
  "num",
  "rand",

@@ -1,10 +1,15 @@
 extern crate sdl2;
+extern crate ears;
+
+use std::time::{Duration, Instant};
 
 use sdl2::event::Event;
 use sdl2::pixels;
 use sdl2::keyboard::Keycode;
 
 use sdl2::gfx::primitives::DrawRenderer;
+
+use ears::{Music, AudioController};
 
 const SCREEN_WIDTH: u32 = 800;
 const SCREEN_HEIGHT: u32 = 600;
@@ -22,12 +27,15 @@ enum InputAction {
 }
 
 struct Note {
+    ticks: u32,
     lane: Fret,
-    time: u32,
+    duration: u32,
 }
 
-struct Chart<T> {
-    notes: T
+struct Chart {
+    ticks_per_beat: u32, // aka Resolution
+    beats_per_minute: u32,
+    notes: std::vec::Vec<Note>,
 }
 
 fn draw_fret<T: sdl2::render::RenderTarget>(canvas: &sdl2::render::Canvas<T>, enabled: bool, x: i16, y: i16, radius: i16, color: pixels::Color) -> Result<(), String> {
@@ -50,9 +58,82 @@ fn main() -> Result<(), String> {
     let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
 
     let mut events = sdl_context.event_pump()?;
+    let mut timer_subsys = sdl_context.timer()?;
 
-    const chart: Chart<[Note; 1]> = Chart {
-        notes: [Note { lane: Fret::G, time: 2 }]
+    let chart: Chart = Chart {
+        ticks_per_beat: 192,
+        beats_per_minute: 135,
+        notes: vec![
+        Note { ticks: 960, lane: Fret::R, duration: 144 },
+        Note { ticks: 960, lane: Fret::Y, duration: 144 },
+        Note { ticks: 960, lane: Fret::B, duration: 144 },
+        Note { ticks: 1344, lane: Fret::O, duration: 0 },
+        Note { ticks: 1536, lane: Fret::Y, duration: 0 },
+        Note { ticks: 1728, lane: Fret::G, duration: 0 },
+        Note { ticks: 1920, lane: Fret::R, duration: 0 },
+        Note { ticks: 2112, lane: Fret::Y, duration: 0 },
+        Note { ticks: 2880, lane: Fret::O, duration: 0 },
+        Note { ticks: 3072, lane: Fret::Y, duration: 0 },
+        Note { ticks: 3264, lane: Fret::G, duration: 0 },
+        Note { ticks: 3456, lane: Fret::R, duration: 0 },
+        Note { ticks: 3648, lane: Fret::Y, duration: 0 },
+        Note { ticks: 4032, lane: Fret::R, duration: 144 },
+        Note { ticks: 4032, lane: Fret::Y, duration: 144 },
+        Note { ticks: 4032, lane: Fret::B, duration: 144 },
+        Note { ticks: 4416, lane: Fret::O, duration: 0 },
+        Note { ticks: 4608, lane: Fret::R, duration: 0 },
+        Note { ticks: 4608, lane: Fret::Y, duration: 0 },
+        Note { ticks: 4608, lane: Fret::B, duration: 0 },
+        Note { ticks: 4800, lane: Fret::G, duration: 0 },
+        Note { ticks: 4992, lane: Fret::R, duration: 0 },
+        Note { ticks: 5184, lane: Fret::Y, duration: 0 },
+        Note { ticks: 5568, lane: Fret::R, duration: 0 },
+        Note { ticks: 5568, lane: Fret::Y, duration: 0 },
+        Note { ticks: 5568, lane: Fret::B, duration: 0 },
+        Note { ticks: 5568, lane: Fret::Y, duration: 1368 },
+        Note { ticks: 5952, lane: Fret::O, duration: 0 },
+        Note { ticks: 6144, lane: Fret::R, duration: 0 },
+        Note { ticks: 6144, lane: Fret::Y, duration: 0 },
+        Note { ticks: 6144, lane: Fret::B, duration: 0 },
+        Note { ticks: 6336, lane: Fret::G, duration: 0 },
+        Note { ticks: 6528, lane: Fret::R, duration: 0 },
+        Note { ticks: 6720, lane: Fret::Y, duration: 0 },
+        //Note { ticks: 6912, lane: 7, duration: 0 },
+        Note { ticks: 7488, lane: Fret::Y, duration: 0 },
+        Note { ticks: 7488, lane: Fret::B, duration: 0 },
+        Note { ticks: 7584, lane: Fret::R, duration: 0 },
+        Note { ticks: 7584, lane: Fret::Y, duration: 0 },
+        Note { ticks: 7680, lane: Fret::Y, duration: 0 },
+        Note { ticks: 7680, lane: Fret::B, duration: 0 },
+        Note { ticks: 7776, lane: Fret::R, duration: 0 },
+        Note { ticks: 7872, lane: Fret::Y, duration: 96 },
+        Note { ticks: 8064, lane: Fret::Y, duration: 0 },
+        Note { ticks: 8160, lane: Fret::R, duration: 0 },
+        Note { ticks: 8256, lane: Fret::B, duration: 0 },
+        Note { ticks: 8352, lane: Fret::Y, duration: 0 },
+        Note { ticks: 8448, lane: Fret::R, duration: 0 },
+        Note { ticks: 8448, lane: Fret::Y, duration: 0 },
+        Note { ticks: 8448, lane: Fret::B, duration: 0 },
+        Note { ticks: 8544, lane: Fret::Y, duration: 0 },
+        Note { ticks: 8568, lane: Fret::B, duration: 0 },
+        Note { ticks: 8640, lane: Fret::R, duration: 192 },
+        Note { ticks: 9024, lane: Fret::Y, duration: 0 },
+        Note { ticks: 9072, lane: Fret::R, duration: 0 },
+        Note { ticks: 9120, lane: Fret::B, duration: 0 },
+        Note { ticks: 9216, lane: Fret::Y, duration: 0 },
+        Note { ticks: 9312, lane: Fret::R, duration: 0 },
+        Note { ticks: 9360, lane: Fret::G, duration: 0 },
+        Note { ticks: 9408, lane: Fret::R, duration: 0 },
+        Note { ticks: 9432, lane: Fret::Y, duration: 0 },
+        Note { ticks: 9504, lane: Fret::B, duration: 0 },
+        //Note { ticks: 9504, lane: 5, duration: 0 },
+        Note { ticks: 9888, lane: Fret::R, duration: 0 },
+        Note { ticks: 9888, lane: Fret::Y, duration: 0 },
+        Note { ticks: 9888, lane: Fret::B, duration: 0 },
+        Note { ticks: 9984, lane: Fret::G, duration: 0 },
+        Note { ticks: 9984, lane: Fret::R, duration: 0 },
+        Note { ticks: 9984, lane: Fret::Y, duration: 0 },
+        Note { ticks: 10560, lane: Fret::B, duration: 72 },]
     };
 
     let mut frets: [bool; 5] = [false, false, false, false, false];
@@ -62,7 +143,7 @@ fn main() -> Result<(), String> {
     frets[Fret::B as usize] = false;
     frets[Fret::O as usize] = false;
 
-    fn draw<T: sdl2::render::RenderTarget>(canvas: &mut sdl2::render::Canvas<T>, frets: &[bool; 5]) {
+    fn draw<T: sdl2::render::RenderTarget>(canvas: &mut sdl2::render::Canvas<T>, chart: &Chart, frets: &[bool; 5], time: f32) {
         canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
         canvas.clear();
 
@@ -73,7 +154,14 @@ fn main() -> Result<(), String> {
         let _ = draw_fret(&canvas, frets[Fret::O as usize], 450, (SCREEN_HEIGHT as i16) - 75, 25, pixels::Color::RGB(192, 128, 00));
 
         for note in &chart.notes {
-            let _ = draw_fret(&canvas, true, 50 + (note.lane as i16) * 100, 50, 17, pixels::Color::RGB(60, 80, 100));
+            let ms_in = ((note.ticks as f32) / (chart.ticks_per_beat as f32)) / (chart.beats_per_minute as f32) * 60f32 * 1000f32;
+            let position_past_time = ms_in - time;
+            let progress_on_screen = position_past_time / 1000f32;
+            if progress_on_screen > 1f32 || progress_on_screen < 0f32 {
+                continue;
+            }
+            let y = ((1f32 - progress_on_screen) * (SCREEN_HEIGHT as f32)) as i16 - 75;
+            let _ = draw_fret(&canvas, true, 50 + (note.lane as i16) * 100, y, 17, pixels::Color::RGB(60, 80, 100));
         }
 
         canvas.present();
@@ -101,9 +189,27 @@ fn main() -> Result<(), String> {
             })
     }
 
+    let mut music = ears::Sound::new("test.ogg")?;
+    music.play();
+
+    let mut previous_frame_time = Instant::now();
+    let mut last_playhead_pos_ms = 0f32;
+    let mut song_time_ms = 0f32;
+
     let mut run = true;
     while run {
-        draw(&mut canvas, &frets);
+        // https://www.reddit.com/r/gamedev/comments/13y26t/how_do_rhythm_games_stay_in_sync_with_the_music/c78aawd/
+        let this_frame_time = Instant::now();
+        song_time_ms += this_frame_time.duration_since(previous_frame_time).as_millis() as f32;
+        previous_frame_time = this_frame_time;
+
+        let playhead_pos_ms = music.get_offset() * 1000f32;
+        if playhead_pos_ms != last_playhead_pos_ms {
+            song_time_ms = (song_time_ms + playhead_pos_ms) / 2f32;
+            last_playhead_pos_ms = playhead_pos_ms;
+        }
+
+        draw(&mut canvas, &chart, &frets, song_time_ms);
 
         input(&mut events)
             .for_each(|action| match action {
