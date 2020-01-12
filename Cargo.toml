@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 ears = { git = "https://github.com/nickbrowne/ears.git", branch = "fix-music-buffer-bug" }
+regex = "1"
 
 [dependencies.sdl2]
 version = "0.32"
