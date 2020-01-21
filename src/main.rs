@@ -117,7 +117,17 @@ fn main() -> Result<(), String> {
                 continue;
             }
             let y = ((1f32 - progress_on_screen) * (SCREEN_HEIGHT as f32)) as i16 - 75;
-            let _ = draw_fret(&canvas, true, 50 + (note.lane as i16) * 100, y, 17, pixels::Color::RGB(60, 80, 100));
+
+            if note.is_open() {
+                let _ = canvas.rectangle(50, y - 2, 462, y + 2, pixels::Color::RGB(200, 60, 200));
+            } else {
+                note.chord.iter()
+                    .enumerate()
+                    .filter(|(_i, chord_note)| **chord_note)
+                    .for_each(|(note_index, _chord_note)| {
+                        let _ = draw_fret(&canvas, true, 50 + (note_index as i16) * 100, y, 17, pixels::Color::RGB(60, 80, 100));
+                    });
+            }
         }
 
         canvas.present();

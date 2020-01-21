@@ -5,10 +5,23 @@ pub enum Fret {
 	G = 0, R, Y, B, O
 }
 
+pub enum GuitarNoteStrumType {
+	Strum,
+	Hopo,
+	Tap,
+}
+
 pub struct GuitarNote {
 	pub ticks: u64,
 	pub chord: [bool; 5],
+	pub strum_type: GuitarNoteStrumType,
 	pub duration: u64,
+}
+
+impl GuitarNote {
+	pub fn is_open(self: &Self) -> bool {
+		!(self.chord[0] || self.chord[1] || self.chord[2] || self.chord[3] || self.chord[4])
+	}
 }
 
 // TODO: refactor
@@ -62,19 +75,39 @@ impl GuitarPlaythrough {
 			.ok_or_else(|| "no Expert Guitar part found")? // TODO: handle
 			.notes
 			.iter()
-			.map(|note| Ok(GuitarNote {
-				ticks: note.ticks,
-				lane: match note.note {
-					0 => Some(Fret::G),
-					1 => Some(Fret::R),
-					2 => Some(Fret::Y),
-					3 => Some(Fret::B),
-					4 => Some(Fret::O),
-					_ => None,
-				}.unwrap_or(Fret::G), // TODO: handle
-				duration: note.duration,
-			}))
-			.collect::<Result<Vec<GuitarNote>, &'static str>>()?,
+			.fold(Vec::new(), |mut notes, note| {
+				let prev_note_in_chord = match notes.last_mut() {
+					None => None,
+					Some(prev_note) => if note.ticks == prev_note.ticks { Some(prev_note) } else { None },
+				};
+
+				let note_to_modify: &mut GuitarNote = match prev_note_in_chord {
+					Some(prev_note) => prev_note,
+					None => {
+						notes.push(GuitarNote {
+							ticks: note.ticks,
+							chord: [false, false, false, false, false],
+							strum_type: GuitarNoteStrumType::Strum,
+							duration: note.duration,
+						});
+						notes.last_mut().unwrap()
+					}
+				};
+
+				match note.note {
+					0 => note_to_modify.chord[Fret::G as usize] = true,
+					1 => note_to_modify.chord[Fret::R as usize] = true,
+					2 => note_to_modify.chord[Fret::Y as usize] = true,
+					3 => note_to_modify.chord[Fret::B as usize] = true,
+					4 => note_to_modify.chord[Fret::O as usize] = true,
+					5 => note_to_modify.strum_type = GuitarNoteStrumType::Hopo, // TODO: this really means FORCE - calculate hopo or not
+					6 => note_to_modify.strum_type = GuitarNoteStrumType::Tap,
+					7 => note_to_modify.chord = [false, false, false, false, false],
+					_ => (), // TODO: warn or something
+				}
+
+				return notes;
+			})
 		};
 
 		return Ok(GuitarPlaythrough {
@@ -146,13 +179,7 @@ impl GuitarPlaythrough {
 
 				let note = &self.chart.notes[self.next_note_index];
 
-				// TODO: pull real chord from GuitarNote
-				let chord: [bool; 5] = [(note.lane as usize) == 0,
-										(note.lane as usize) == 1,
-										(note.lane as usize) == 2,
-										(note.lane as usize) == 3,
-										(note.lane as usize) == 4];
-				let fretted = frets_match(self.frets, chord);
+				let fretted = frets_match(self.frets, note.chord);
 				let on_time = f32::abs(time_ms - self.chart.ticks_to_ms(note.ticks)) <= HALF_HIT_WINDOW_MS;
 
 				if fretted && on_time {
