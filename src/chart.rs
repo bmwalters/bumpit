@@ -10,6 +10,11 @@ pub struct SongStreams {
     pub drum: Option<String>,
 }
 
+pub enum SongPlayer2 {
+    Bass,
+    Rhythm,
+}
+
 pub struct Song {
     pub name: Option<String>,
     pub artist: Option<String>,
@@ -18,12 +23,12 @@ pub struct Song {
     pub year: Option<String>,
     pub offset: Option<u64>,
     pub resolution: u64,
-    pub player2: Option<String>, // TODO: machine-intended
-    pub difficulty: Option<u64>, // TODO: machine-intended?
+    pub player2: Option<SongPlayer2>,
+    pub difficulty: Option<u64>,
     pub preview_start: Option<f32>,
     pub preview_end: Option<f32>,
     pub genre: Option<String>,
-    pub media_type: Option<String>, // TODO: machine-intended?
+    pub media_type: Option<String>,
     pub streams: SongStreams,
 }
 
@@ -40,7 +45,10 @@ pub enum Event {
     // Moonscraper allows typing strings because it is not the consumer.
     // Entirely strings -> game has to match on strings
     // Some enums + General string -> what's the point of the enums?
+    // and anyone who matches on strings has to update when we support.
     // No strings -> We parse exactly what we can deal with.
+    // Would be easier if .chart wasn't a moving target
+    // i.e. specific version with set list of features
 }
 
 pub enum SpecialEvent {
@@ -207,6 +215,13 @@ fn build_song<'a>(song_entries: impl Iterator<Item = (&'a str, &'a str)>) -> Res
     let cleaned_year = |year_str: String|
         if year_str.starts_with(", ") { year_str[2..].to_string() } else { year_str };
 
+    let parse_player_2 = |player2_str: String|
+        match player2_str.to_lowercase().as_ref() {
+            "bass" => Some(SongPlayer2::Bass),
+            "rhythm" => Some(SongPlayer2::Rhythm),
+            _ => None,
+        };
+
     // resolution is the only non-optional field. An error is raised if it is not present.
     // All other fields are optional; however if a field is present and fails to parse, an error is raised.
     return Ok(Song {
@@ -217,7 +232,7 @@ fn build_song<'a>(song_entries: impl Iterator<Item = (&'a str, &'a str)>) -> Res
         year:          take_quoted(&mut fields, "year").map(cleaned_year),
         offset:           take_int(&mut fields, "offset")?,
         resolution:       take_int(&mut fields, "resolution")?.ok_or_else(|| SongError::MissingResolution)?,
-        player2:              take(&mut fields, "player2"),
+        player2:              take(&mut fields, "player2").and_then(parse_player_2),
         difficulty:       take_int(&mut fields, "difficulty")?,
         preview_start:  take_float(&mut fields, "previewstart")?,
         preview_end:    take_float(&mut fields, "previewend")?,
