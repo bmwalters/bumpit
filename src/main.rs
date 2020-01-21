@@ -77,6 +77,34 @@ enum FrameLimit {
 
 fn main() -> Result<(), String> {
     let sdl_context = sdl2::init()?;
+
+    /* joystick initialization */
+
+    let joystick_subsystem = sdl_context.joystick()?;
+
+    let available = joystick_subsystem.num_joysticks()
+        .map_err(|e| format!("can't enumerate joysticks: {}", e))?;
+
+    println!("{} joysticks available", available);
+
+    // Iterate over all available joysticks and stop once we manage to open one.
+    let mut joystick = (0..available).find_map(|id| match joystick_subsystem.open(id) {
+        Ok(c) => {
+            println!("Success: opened \"{}\"", c.name());
+            Some(c)
+        },
+        Err(e) => {
+            println!("failed: {:?}", e);
+            None
+        },
+    }).expect("Couldn't open any joystick");
+
+    // Print the joystick's power level
+    println!("\"{}\" power level: {:?}", joystick.name(), joystick.power_level()
+        .map_err(|e| e.to_string())?);
+
+    /* window initialization */
+
     let video_subsys = sdl_context.video()?;
     let window = video_subsys.window("bumpit", SCREEN_WIDTH, SCREEN_HEIGHT)
         .position_centered()
@@ -152,6 +180,21 @@ fn main() -> Result<(), String> {
                 Event::KeyUp { keycode : Some(Keycode::B), .. } => Some(GameInputAction::ButtonUp(GameButton::Orange)),
 
                 Event::KeyDown { keycode : Some(Keycode::Space), .. } => Some(GameInputAction::Strum),
+
+                Event::JoyButtonDown { button_idx : 0, .. } => Some(GameInputAction::ButtonDown(GameButton::Green)),
+                Event::JoyButtonDown { button_idx : 1, .. } => Some(GameInputAction::ButtonDown(GameButton::Red)),
+                Event::JoyButtonDown { button_idx : 3, .. } => Some(GameInputAction::ButtonDown(GameButton::Yellow)),
+                Event::JoyButtonDown { button_idx : 2, .. } => Some(GameInputAction::ButtonDown(GameButton::Blue)),
+                Event::JoyButtonDown { button_idx : 4, .. } => Some(GameInputAction::ButtonDown(GameButton::Orange)),
+
+                Event::JoyButtonUp { button_idx : 0, .. } => Some(GameInputAction::ButtonUp(GameButton::Green)),
+                Event::JoyButtonUp { button_idx : 1, .. } => Some(GameInputAction::ButtonUp(GameButton::Red)),
+                Event::JoyButtonUp { button_idx : 3, .. } => Some(GameInputAction::ButtonUp(GameButton::Yellow)),
+                Event::JoyButtonUp { button_idx : 2, .. } => Some(GameInputAction::ButtonUp(GameButton::Blue)),
+                Event::JoyButtonUp { button_idx : 4, .. } => Some(GameInputAction::ButtonUp(GameButton::Orange)),
+
+                Event::JoyHatMotion { hat_idx : 0, state : sdl2::joystick::HatState::Up, .. } => Some(GameInputAction::Strum),
+                Event::JoyHatMotion { hat_idx : 0, state : sdl2::joystick::HatState::Down, .. } => Some(GameInputAction::Strum),
 
                 _ => None
             })
